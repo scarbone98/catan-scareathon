@@ -1,6 +1,5 @@
-import './socket.js';
+import { isPlayersTurn, sendMove } from './socket.js';
 import { drawBoard } from "./canvas.js";
-import { sendMove } from './socket.js';
 
 const canvas = document.getElementById('catanBoard');
 const ctx = canvas.getContext('2d');
@@ -13,7 +12,10 @@ export let gameState = {
     desertIndex: 0,
     tokenDistribution: [],
     arrangedTiles: [],
-    id: null
+    id: null,
+    currentState: 'LOBBY',
+    currentTurnIndex: 0,
+    playerOrder: []
 }
 
 export let players = [];
@@ -41,9 +43,9 @@ export function getGameState() {
 }
 
 
-export function setGameState({ gameState: newGameState, id, players }) {
+export function setGameState({ gameState: newGameState, id, players: incomingPlayers }) {
     gameState = { ...gameState, ...newGameState, id };
-    players = players;
+    players = incomingPlayers;
 }
 
 export function setPlayerColor(color) {
@@ -122,6 +124,7 @@ function isValidSettlementLocation(x, y) {
 }
 
 canvas.addEventListener('click', function (event) {
+    if (gameState.currentState === "LOBBY" || !isPlayersTurn()) return;
     const x = event.clientX - canvas.offsetLeft;
     const y = event.clientY - canvas.offsetTop;
 
@@ -241,6 +244,7 @@ function pointToLineSegmentDistance(x, y, x1, y1, x2, y2) {
 // ROAD CLICKED 
 const edgeClickThreshold = 5; // distance in pixels to detect click near an edge
 canvas.addEventListener('click', function (event) {
+    if (gameState.currentState === "LOBBY" || !isPlayersTurn()) return;
     const x = event.clientX - canvas.offsetLeft;
     const y = event.clientY - canvas.offsetTop;
 

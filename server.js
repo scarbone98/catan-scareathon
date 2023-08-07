@@ -5,6 +5,7 @@ const cors = require('cors');
 const path = require('path');
 const { v4: uuidv4 } = require('uuid');
 const { initializeGameState } = require('./game-server');
+const { shuffle } = require("./utils.js");
 
 const app = express();
 const server = http.createServer(app);
@@ -42,7 +43,7 @@ io.on('connection', (socket) => {
             rooms[roomToJoin].players = [{ id: socket.id, color: colors[Math.floor(Math.random() * colors.length)] }];
             rooms[roomToJoin].gameState = initializeGameState();
             rooms[roomToJoin].id = roomToJoin;
-        } else {
+        } else if (rooms[roomToJoin].gameState.currentState === 'LOBBY') {
             // Filter out remaining colors
             colors = colors.filter(color => !rooms[roomToJoin].players.find(player => player.color === color));
             rooms[roomToJoin].players.push({ id: socket.id, color: colors[Math.floor(Math.random() * colors.length)] });
@@ -52,6 +53,31 @@ io.on('connection', (socket) => {
 
         socket.join(roomToJoin);
         io.to(roomToJoin).emit('joined-room', rooms[roomToJoin]);
+    });
+
+    socket.on('start-game', (roomId) => {
+        const room = rooms[roomId];
+        if (!room) return;
+
+        room.gameState.currentState = 'SETUP';
+        room.gameState.playerOrder = [...room.players];
+        shuffle(room.gameState.playerOrder);
+
+        room.gameState.currentTurnIndex = 0;
+
+        io.to(roomId).emit('update-game-state', room);
+    });
+
+    socket.on('end-turn', (id) => {
+        if (!rooms[id]) return;
+        const gameState = rooms[id].gameState;
+        const nextTurnIndex = ((gameState.currentTurnIndex + 1) % gameState.playerOrder.length);
+        rooms[id].gameState.currentTurnIndex = nextTurnIndex;
+        io.to(id).emit('update-game-state', rooms[id]);
+    });
+
+    socket.on('roll-die', (gameState) => {
+
     });
 
     socket.on('make-move', (gameState) => {
@@ -68,6 +94,8 @@ io.on('connection', (socket) => {
         rooms[roomId].players = rooms[roomId]?.players?.filter(player => player === socket.id);
         if (rooms[roomId].players.length <= 0) {
             delete rooms[roomId];
+        } else {
+            io.to(roomId).emit('update-game-state', rooms[roomId]);
         }
     });
 

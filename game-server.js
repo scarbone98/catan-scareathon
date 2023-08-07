@@ -27,6 +27,7 @@ function getTilesArray() {
 }
 
 function initializeGameState() {
+    const currentState = 'LOBBY';
     let hexes = []; // Store hexagon positions and resource types
     let roads = []; // Store roads placed
     let settlements = [];
@@ -42,6 +43,7 @@ function initializeGameState() {
 
 
     return {
+        currentState,
         hexes,
         roads,
         settlements,

@@ -1,35 +1,36 @@
 import { setGameState, drawInitialBoard, setPlayerColor, getGameState } from "./main.js";
 import { drawBoard } from "./canvas.js";
 
-const socket = io.connect('/');
+export const socket = io.connect('/');
 
 // Emit a move to the server
 export function sendMove() {
     socket.emit('make-move', getGameState());
 }
 
-// // Listen for moves made by other clients
-// socket.on('move-made', function (move) {
-//     // Handle the received move
-//     // For example, update the game board UI based on the move details
-//     switch (move.type) {
-//         case 'PLACE_SETTLEMENT':
-//             console.log({ move });
-//             setSettlements(move.payload.settlements);
-//             drawBoard();
-//             break;
-//         case 'PLACE_ROAD':
-//             console.log({ move });
-//             setRoads(move.payload.roads);
-//             drawBoard();
-//             break;
-//         default:
-//             break;
-//     }
-// });
+export function startGame() {
+    socket.emit('start-game', getGameState().id);
+}
 
+export function endTurn() {
+    socket.emit('end-turn', getGameState().id);
+}
+
+export function getPlayerWithCurrentTurn() {
+    const gameState = getGameState();
+    if (gameState.currentState === "LOBBY") return null;
+    return gameState.playerOrder[gameState.currentTurnIndex];
+}
+
+
+export function isPlayersTurn() {
+    const gameState = getGameState();
+    if (gameState.currentState === "LOBBY") return null;
+    return gameState.playerOrder[gameState.currentTurnIndex].id === socket.id;
+}
 
 socket.on('update-game-state', (gameState) => {
+    console.log(gameState.gameState.currentTurnIndex);
     setGameState(gameState);
     drawBoard();
 });

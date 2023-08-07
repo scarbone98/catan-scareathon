@@ -1,8 +1,10 @@
 import {
     hexes,
     gameState,
+    players,
     hexSize
 } from "./main.js";
+import { startGame, isPlayersTurn, endTurn, getPlayerWithCurrentTurn } from "./socket.js";
 
 const resourceColors = {
     'WOOD': '#228B22',
@@ -15,6 +17,24 @@ const resourceColors = {
 
 const canvas = document.getElementById('catanBoard');
 const ctx = canvas.getContext('2d');
+
+canvas.addEventListener('click', buttonClicked);
+
+function buttonClicked(event) {
+    const rect = canvas.getBoundingClientRect();
+    const x = event.clientX - rect.left;
+    const y = event.clientY - rect.top;
+
+    // Check if the click is within the bounds of the start button
+    if (gameState.currentState === "LOBBY" && x >= 0 && x <= 100 && y >= 0 && y <= 100) {
+        startGame();
+    }
+
+    // Check if the click is within the bounds of the end turn button
+    else if (isPlayersTurn() && x >= 0 && x <= 100 && y >= 0 && y <= 100) {
+        endTurn();
+    }
+}
 
 export function drawBoard() {
     // Clear the whole board
@@ -59,6 +79,17 @@ export function drawBoard() {
     //     drawDie(ctx, ctx.canvas.width / 2 + spacing / 2, ctx.canvas.height / 2 - size / 2, size, diceValues[1]);
     // }
 
+    for (let i = 0; i < players.length; i++) {
+        const currentPlayer = players[i];
+        drawPlayerCard({ x: canvas.width / 2 + 200, y: 100 * i, name: 'test', color: currentPlayer.color, id: currentPlayer.id });
+    }
+
+    if (gameState.currentState === "LOBBY") {
+        drawStartButton();
+    } else if (isPlayersTurn()) {
+        drawEndTurnButton();
+    }
+
 }
 
 function drawHex(x, y, resource) {
@@ -72,12 +103,38 @@ function drawHex(x, y, resource) {
     ctx.fill();
 }
 
-function isRobberOnHex(hexX, hexY) {
-    const dx = hexX - robber.x;
-    const dy = hexY - robber.y;
-    const distance = Math.sqrt(dx * dx + dy * dy);
 
-    return distance < 15;  // 5 pixels or some small threshold
+function drawPlayerCard({ x, y, name, color, id }) {
+    if (gameState.currentState !== "LOBBY" && id === getPlayerWithCurrentTurn().id) {
+        ctx.fillStyle = "#000";
+        ctx.fillRect(x - 3, y - 3, 106, 106);
+    }
+    ctx.fillStyle = color;
+    ctx.fillRect(x, y, 100, 100);
+    ctx.font = '18px Arial';
+    ctx.fillStyle = 'white';
+    ctx.textAlign = 'center';
+    ctx.fillText(name, x + 50, y + 30);
+}
+
+function drawEndTurnButton() {
+    ctx.fillStyle = '#0099ff';
+    ctx.fillRect(0, 0, 100, 100);
+
+    ctx.font = '24px Arial';
+    ctx.fillStyle = 'white';
+    ctx.textAlign = 'center';
+    ctx.fillText('End Turn', 50, 50);
+}
+
+function drawStartButton() {
+    ctx.fillStyle = '#0099ff';
+    ctx.fillRect(0, 0, 100, 100);
+
+    ctx.font = '24px Arial';
+    ctx.fillStyle = 'white';
+    ctx.textAlign = 'center';
+    ctx.fillText('Start', 50, 50);
 }
 
 function drawRobber(x, y) {
