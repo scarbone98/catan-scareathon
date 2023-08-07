@@ -169,7 +169,7 @@ function isNearSettlement(x, y) {
         const dx = x - settlement.x;
         const dy = y - settlement.y;
         const distance = Math.sqrt(dx * dx + dy * dy);
-        if (distance < 15) {  // Threshold for adjacency
+        if (distance < 15 && playerColor === settlement.color) {  // Threshold for adjacency
             return true;
         }
     }
@@ -199,7 +199,7 @@ function distanceToSegment(p, v, w) {
 function isNearRoad(x, y) {
     for (let road of gameState.roads) {
         const distance = distanceToSegment({ x, y }, road.start, road.end);
-        if (distance < 10) {  // Threshold for adjacency
+        if (distance < 10 && playerColor === road.color) {  // Threshold for adjacency
             return true;
         }
     }
