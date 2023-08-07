@@ -2,6 +2,9 @@ export default class Player {
     constructor(name, id) {
         this.name = name;
         this.id = id;
+        this.points = 0;
+        this.resources = [];
+        this.devCards = [];
         this.settlements = [];
         this.cards = {
             brick: 0,
@@ -11,5 +14,17 @@ export default class Player {
             wood: 0,
         }
     }
-    addSettlement()
+    addSettlement(x, y) {
+        this.settlements.push({ x, y });
+    }
+    addDevCard() {
+
+    }
+    addResource() {
+
+    }
+    removeResources() {
+
+    }
+    
 }

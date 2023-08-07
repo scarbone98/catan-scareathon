@@ -1,20 +1,16 @@
 import {
     hexes,
-    roads,
-    settlements,
-    diceValues,
-    robber,
-    hexSize,
-    desertIndex,
-    tokenDistribution
+    gameState,
+    hexSize
 } from "./main.js";
 
 const resourceColors = {
-    'wood': '#228B22',
-    'brick': '#B22222',
-    'wheat': '#FFD700',
-    'sheep': '#ADFF2F',
-    'stone': '#808080'
+    'WOOD': '#228B22',
+    'BRICK': '#B22222',
+    'WHEAT': '#FFD700',
+    'SHEEP': '#ADFF2F',
+    'ROCK': '#808080',
+    'DESERT': '#000'
 };
 
 const canvas = document.getElementById('catanBoard');
@@ -28,26 +24,27 @@ export function drawBoard() {
     for (let { x, y, resource } of hexes) {
         drawHex(x, y, resource);
     }
+
     // Draw robber
-    for (let { x, y, resource } of hexes) {
-        if (isRobberOnHex(x, y)) {
-            drawRobber(x, y);
+    for (let i = 0; i < hexes.length; i++) {
+        if (i === gameState.robberIndex) {
+            drawRobber(hexes[i].x, hexes[i].y);
         }
     }
     // Draw roads
-    for (let { start, end } of roads) {
-        drawRoad(start, end);
+    for (let { start, end, color } of gameState.roads) {
+        drawRoad(start, end, color);
     }
     // Draw settlements
-    for (let { x, y } of settlements) {
-        drawSettlement(x, y);
+    for (let { x, y, color } of gameState.settlements) {
+        drawSettlement(x, y, color);
     }
 
     let tokenIndex = 0;
     // Draw tile tokens
     hexes.forEach((tile, index) => {
-        if (tokenDistribution[tokenIndex] && desertIndex !== index) {  // Ensure there's a token for this tile (excludes desert)
-            drawToken(ctx, tile.x, tile.y, 20, tokenDistribution[tokenIndex]);
+        if (gameState.tokenDistribution[tokenIndex] && gameState.desertIndex !== index) {  // Ensure there's a token for this tile (excludes desert)
+            drawToken(ctx, tile.x, tile.y, 20, gameState.tokenDistribution[tokenIndex]);
             tokenIndex += 1;
         }
     });
@@ -85,7 +82,7 @@ function isRobberOnHex(hexX, hexY) {
 
 function drawRobber(x, y) {
     const circleRadius = 15;
-    ctx.fillStyle = "#000"; // black color for the robber
+    ctx.fillStyle = "#FFF"; // black color for the robber
     ctx.beginPath();
     ctx.arc(x, y, circleRadius, 0, 2 * Math.PI);
     ctx.closePath();
@@ -93,19 +90,19 @@ function drawRobber(x, y) {
 }
 
 
-function drawRoad(start, end) {
+function drawRoad(start, end, color) {
     ctx.beginPath();
     ctx.moveTo(start.x, start.y);
     ctx.lineTo(end.x, end.y);
     ctx.lineWidth = 8;
-    ctx.strokeStyle = "#8B4513";  // Brown for the road
+    ctx.strokeStyle = color;  // Brown for the road
     ctx.stroke();
     ctx.lineWidth = 1;  // Reset lineWidth for other drawings
 }
 
-function drawSettlement(x, y) {
+function drawSettlement(x, y, color) {
     const circleRadius = 10;
-    ctx.fillStyle = "#000"; // Gold color for the settlement
+    ctx.fillStyle = color; // Gold color for the settlement
     ctx.beginPath();
     ctx.arc(x, y, circleRadius, 0, 2 * Math.PI);
     ctx.fill();

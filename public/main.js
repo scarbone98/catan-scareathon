@@ -1,27 +1,34 @@
-import { shuffle } from "./utils.js";
+import './socket.js';
 import { drawBoard } from "./canvas.js";
-import { sendMove } from "./socket.js";
+import { sendMove } from './socket.js';
 
 const canvas = document.getElementById('catanBoard');
 const ctx = canvas.getContext('2d');
 
-const resources = ['wood', 'brick', 'wheat', 'sheep', 'stone'];
+export let gameState = {
+    roads: [],
+    settlements: [],
+    diceValues: null,
+    robberIndex: 0,
+    desertIndex: 0,
+    tokenDistribution: [],
+    arrangedTiles: [],
+    id: null
+}
+
+export let players = [];
+
+export let playerColor = 'WHITE';
 
 export let hexes = []; // Store hexagon positions and resource types
-export let roads = []; // Store roads placed
-export let settlements = [];
 
 export let diceValues = null;
 
-// ROBBER
-// Initialize the robber on a random tile.
-export let robber = {
-    x: 0,
-    y: 0
-};
 export let desertIndex = 0;
 
-export const tokenDistribution = shuffle([2, 3, 3, 4, 4, 5, 5, 6, 6, 8, 8, 9, 9, 10, 10, 11, 11, 12]);
+export const tokenDistribution = [];
+export const arrangedTiles = [];
+
 export const hexSize = 70;
 
 const hexWidth = Math.sqrt(3) * hexSize;
@@ -29,15 +36,23 @@ const hexHeight = 2 * hexSize;
 const vertDist = hexHeight * 0.75;
 
 
-export function setSettlements(updatedSettlements) {
-    settlements = [...updatedSettlements];
-}
-export function setRoads(updatedRoads) {
-    roads = [...updatedRoads];
+export function getGameState() {
+    return gameState;
 }
 
-function initializeValues() {
+
+export function setGameState({ gameState: newGameState, id, players }) {
+    gameState = { ...gameState, ...newGameState, id };
+    players = players;
+}
+
+export function setPlayerColor(color) {
+    playerColor = color;
+}
+
+export function drawInitialBoard() {
     // Drawing the board
+    let resourceMapIndex = 0;
     let startColOffset = 2;
     for (let row = 0; row < 5; row++) {
         let cols;
@@ -61,8 +76,9 @@ function initializeValues() {
         for (let col = 0; col < cols; col++) {
             const x = (col * 1.35 + startColOffset) * hexWidth * .75 + leftOffset + 200;
             const y = vertDist * row * 0.825 * 1.25 + 100;
-            const resource = resources[Math.floor(Math.random() * resources.length)];
+            const resource = gameState.arrangedTiles[resourceMapIndex];
             hexes.push({ x, y, resource });
+            resourceMapIndex++;
         }
 
         if (row < 2) {
@@ -72,16 +88,9 @@ function initializeValues() {
         }
     }
 
-    desertIndex = Math.floor(Math.random() * tokenDistribution.length);
-
-    robber = {
-        ...hexes[desertIndex]
-    };
-
     drawBoard();
 }
 
-initializeValues();
 
 function getHexCorners(x, y) {
     let corners = [];
@@ -99,7 +108,7 @@ function degreesToRadians(degrees) {
 }
 
 function isValidSettlementLocation(x, y) {
-    for (let settlement of settlements) {
+    for (let settlement of gameState.settlements) {
         const dx = x - settlement.x;
         const dy = y - settlement.y;
         const distance = Math.sqrt(dx * dx + dy * dy);
@@ -127,14 +136,9 @@ canvas.addEventListener('click', function (event) {
 
             if (distance < 15) { // 15 is the threshold for corner detection
                 if (isValidSettlementLocation(cornerX, cornerY)) {
-                    settlements.push({ x: cornerX, y: cornerY });
+                    gameState.settlements.push({ x: cornerX, y: cornerY, color: playerColor });
                     drawBoard();
-                    sendMove({
-                        type: "PLACE_SETTLEMENT",
-                        payload: {
-                            settlements
-                        }
-                    })
+                    sendMove();
                     return;
                 } else {
                     alert('Settlements must be at least two edges apart.');
@@ -143,11 +147,7 @@ canvas.addEventListener('click', function (event) {
             }
         }
     }
-    // ... (rest of the event handler code)
 });
-
-// ... [rest of the code]
-
 
 // DETECT EDGE CLICK
 function getEdgePoints(hex) {
@@ -165,7 +165,7 @@ function getEdgePoints(hex) {
 }
 
 function isNearSettlement(x, y) {
-    for (let settlement of settlements) {
+    for (let settlement of gameState.settlements) {
         const dx = x - settlement.x;
         const dy = y - settlement.y;
         const distance = Math.sqrt(dx * dx + dy * dy);
@@ -197,7 +197,7 @@ function distanceToSegment(p, v, w) {
 }
 
 function isNearRoad(x, y) {
-    for (let road of roads) {
+    for (let road of gameState.roads) {
         const distance = distanceToSegment({ x, y }, road.start, road.end);
         if (distance < 10) {  // Threshold for adjacency
             return true;
@@ -257,14 +257,9 @@ canvas.addEventListener('click', function (event) {
             if (distance < 20 &&
                 (isNearSettlement(edge[0].x, edge[0].y) || isNearSettlement(edge[1].x, edge[1].y) ||
                     isNearRoad(edge[0].x, edge[0].y) || isNearRoad(edge[1].x, edge[1].y))) {
-                roads.push({ start: edge[0], end: edge[1] });
+                gameState.roads.push({ start: edge[0], end: edge[1], color: playerColor });
                 drawBoard();
-                sendMove({
-                    type: 'PLACE_ROAD',
-                    payload: {
-                        roads
-                    }
-                })
+                sendMove();
                 return true;  // Indicate that a road was drawn
             }
         }
