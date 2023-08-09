@@ -40,13 +40,13 @@ io.on('connection', (socket) => {
         if (!roomToJoin) {
             roomToJoin = uuidv4();
             rooms[roomToJoin] = {};
-            rooms[roomToJoin].players = [{ id: socket.id, color: colors[Math.floor(Math.random() * colors.length)] }];
+            rooms[roomToJoin].players = [{ id: socket.id, color: colors[Math.floor(Math.random() * colors.length)], cards: [] }];
             rooms[roomToJoin].gameState = initializeGameState();
             rooms[roomToJoin].id = roomToJoin;
         } else if (rooms[roomToJoin].gameState.currentState === 'LOBBY') {
             // Filter out remaining colors
             colors = colors.filter(color => !rooms[roomToJoin].players.find(player => player.color === color));
-            rooms[roomToJoin].players.push({ id: socket.id, color: colors[Math.floor(Math.random() * colors.length)] });
+            rooms[roomToJoin].players.push({ id: socket.id, color: colors[Math.floor(Math.random() * colors.length)], cards: [] });
         }
 
         playerToRoomMap[socket.id] = roomToJoin;
@@ -59,11 +59,13 @@ io.on('connection', (socket) => {
         const room = rooms[roomId];
         if (!room) return;
 
-        room.gameState.currentState = 'SETUP';
+        room.gameState.currentState = "SETUP";
+        room.gameState.setupTurnCount = 1;
         room.gameState.playerOrder = [...room.players];
         shuffle(room.gameState.playerOrder);
 
         room.gameState.currentTurnIndex = 0;
+        room.gameState.diceValues = [1, 1];
 
         io.to(roomId).emit('update-game-state', room);
     });
@@ -71,13 +73,66 @@ io.on('connection', (socket) => {
     socket.on('end-turn', (id) => {
         if (!rooms[id]) return;
         const gameState = rooms[id].gameState;
+        const room = rooms[id];
+
+        if (gameState.currentState === "SETUP") {
+            if (gameState.setupTurnCount === room.players.length * 2) {
+                room.gameState.currentState = "ROLLING-DICE";
+                room.gameState.diceValues = [1, 1];
+                room.gameState.currentTurnIndex = 0;
+            } else {
+                if (room.gameState.currentTurnIndex >= room.players.length - 1) {
+                    room.gameState.currentTurnIndex = Math.max(room.gameState.currentTurnIndex - 1, 0);
+                } else {
+                    room.gameState.currentTurnIndex = room.gameState.currentTurnIndex + 1;
+                }
+                room.gameState.setupTurnCount += 1;
+            }
+            io.to(id).emit('update-game-state', room);
+            return;
+        }
+
         const nextTurnIndex = ((gameState.currentTurnIndex + 1) % gameState.playerOrder.length);
-        rooms[id].gameState.currentTurnIndex = nextTurnIndex;
-        io.to(id).emit('update-game-state', rooms[id]);
+
+        room.gameState.currentTurnIndex = nextTurnIndex;
+        room.gameState.diceValues = [1, 1];
+        room.gameState.currentState = "ROLLING-DICE";
+        io.to(id).emit('update-game-state', room);
     });
 
-    socket.on('roll-die', (gameState) => {
+    socket.on('roll-dice', (id) => {
+        const dice1 = Math.floor(Math.random() * 6) + 1;
+        const dice2 = Math.floor(Math.random() * 6) + 1;
+        rooms[id].gameState.diceValues = [dice1, dice2];
+        rooms[id].gameState.currentState = "PLAYER-TURN";
 
+        const playerToCardsMap = {};
+
+        const rolledNumber = dice1 + dice2;
+
+        console.log(rooms[id].players[0].cards);
+
+        for (let settlement of rooms[id].gameState.settlements) {
+            for (let adjacentResouce of settlement.adjacentResources) {
+                if (adjacentResouce.tokenNumber === rolledNumber) {
+                    if (!playerToCardsMap[settlement.owner]) {
+                        playerToCardsMap[settlement.owner] = [];
+                    }
+                    if (adjacentResouce.resource !== "DESERT") {
+                        playerToCardsMap[settlement.owner].push(adjacentResouce.resource);
+                    }
+                }
+            }
+        }
+
+        for (let key of Object.keys(playerToCardsMap)) {
+            const player = rooms[id].players.find(({ id }) => id === key);
+            if (player) {
+                player.cards = [...player.cards, ...playerToCardsMap[key]];
+            }
+        }
+
+        io.to(id).emit('dice-rolled', rooms[id]);
     });
 
     socket.on('make-move', (gameState) => {

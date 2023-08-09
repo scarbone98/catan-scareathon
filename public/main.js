@@ -1,8 +1,7 @@
-import { isPlayersTurn, sendMove } from './socket.js';
+import { isPlayersTurn, sendMove, socket } from './socket.js';
 import { drawBoard } from "./canvas.js";
 
 const canvas = document.getElementById('catanBoard');
-const ctx = canvas.getContext('2d');
 
 export let gameState = {
     roads: [],
@@ -27,6 +26,8 @@ export let hexes = []; // Store hexagon positions and resource types
 export let diceValues = null;
 
 export let desertIndex = 0;
+
+export let selectedCards = {};
 
 export const tokenDistribution = [];
 export const arrangedTiles = [];
@@ -123,8 +124,86 @@ function isValidSettlementLocation(x, y) {
     return true; // The location is valid
 }
 
+
+
+function getAdjacentHexes(x, y) {
+    // This is nasty but we 'skip' over the desert when rendering the tokens in the hexes this will account for that
+    function getTokenDistributionIndex(end) {
+        let res = 0;
+        for (let i = 0; i < end; i++) {
+            if (hexes[i].resource === "DESERT") {
+                continue;
+            }
+            res++;
+        }
+        return res;
+    }
+
+    const adjacentHexes = [];
+    for (let i = 0; i < hexes.length; i++) {
+        const dx = x - hexes[i].x;
+        const dy = y - hexes[i].y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        if (distance < 1.5 * hexSize) {
+            adjacentHexes.push({ resource: hexes[i].resource, tokenNumber: gameState.tokenDistribution[getTokenDistributionIndex(i)] });
+        }
+    }
+    return adjacentHexes;
+}
+
+function hasCardsSelected(target) {
+    let targetCount = {};
+    switch (target) {
+        case 'SETTLEMENT':
+            targetCount = {
+                'WHEAT': 1,
+                'SHEEP': 1,
+                'BRICK': 1,
+                'WOOD': 1
+            }
+            break
+        case 'CITY':
+            targetCount = {
+                'WHEAT': 2,
+                'ROCK': 3
+            }
+            break
+        case 'DEV_CARD':
+            targetCount = {
+                'SHEEP': 1,
+                'ROCK': 1,
+                'WHEAT': 1
+            }
+            break
+    }
+
+    for (let cardValue of Object.values(selectedCards)) {
+        if (targetCount[cardValue]) {
+            targetCount[cardValue] -= 1;
+        } else {
+            return false;
+        }
+    }
+    return Object.values(targetCount).reduce((partialSum, a) => partialSum + a, 0) === 0;
+}
+
+export function canEndTurn() {
+    if (isPlayersTurn() && gameState.currentState === "SETUP" && (!setupState.placedSetupRoad || !setupState.placedSetupSettlement)) {
+        return false;
+    }
+    return isPlayersTurn();
+}
+
+
+export const setupState = {
+    placedSetupRoad: false,
+    placedSetupSettlement: false
+}
+
+// SETTLEMENT PLACEMENT
 canvas.addEventListener('click', function (event) {
-    if (gameState.currentState === "LOBBY" || !isPlayersTurn()) return;
+    if (gameState.currentState === "LOBBY" || !isPlayersTurn() || (!hasCardsSelected('SETTLEMENT') && gameState.currentState !== "SETUP")) return;
+
     const x = event.clientX - canvas.offsetLeft;
     const y = event.clientY - canvas.offsetTop;
 
@@ -139,13 +218,24 @@ canvas.addEventListener('click', function (event) {
 
             if (distance < 15) { // 15 is the threshold for corner detection
                 if (isValidSettlementLocation(cornerX, cornerY)) {
-                    gameState.settlements.push({ x: cornerX, y: cornerY, color: playerColor });
-                    drawBoard();
-                    sendMove();
-                    return;
-                } else {
-                    alert('Settlements must be at least two edges apart.');
-                    return;
+                    if (gameState.currentState === "SETUP" && !setupState.placedSetupSettlement) {
+                        const adjacentResources = getAdjacentHexes(cornerX, cornerY);
+                        gameState.settlements.push({ x: cornerX, y: cornerY, color: playerColor, adjacentResources, owner: socket.id });
+                        drawBoard();
+                        sendMove();
+                        setupState.placedSetupSettlement = true;
+                        return;
+                    }
+                    else if (gameState.currentState !== "SETUP") {
+                        const adjacentResources = getAdjacentHexes(cornerX, cornerY);
+                        gameState.settlements.push({ x: cornerX, y: cornerY, color: playerColor, adjacentResources, owner: socket.id });
+                        drawBoard();
+                        sendMove();
+                        return;
+                    } else {
+                        alert('Settlements must be at least two edges apart.');
+                        return;
+                    }
                 }
             }
         }
@@ -258,28 +348,27 @@ canvas.addEventListener('click', function (event) {
             const dy = y - middleY;
             const distance = Math.sqrt(dx * dx + dy * dy);
 
-            if (distance < 20 &&
-                (isNearSettlement(edge[0].x, edge[0].y) || isNearSettlement(edge[1].x, edge[1].y) ||
-                    isNearRoad(edge[0].x, edge[0].y) || isNearRoad(edge[1].x, edge[1].y))) {
-                gameState.roads.push({ start: edge[0], end: edge[1], color: playerColor });
-                drawBoard();
-                sendMove();
-                return true;  // Indicate that a road was drawn
+            if (distance < 20) {
+                if (isNearSettlement(edge[0].x, edge[0].y) || isNearSettlement(edge[1].x, edge[1].y) ||
+                    isNearRoad(edge[0].x, edge[0].y) || isNearRoad(edge[1].x, edge[1].y)) {
+                    if (gameState.currentState === "SETUP" && !setupState.placedSetupRoad) {
+                        setupState.placedSetupRoad = true;
+                        gameState.roads.push({ start: edge[0], end: edge[1], color: playerColor });
+                        drawBoard();
+                        sendMove();
+                        return true;
+                    } else if (gameState.currentState !== "SETUP") {
+                        gameState.roads.push({ start: edge[0], end: edge[1], color: playerColor });
+                        drawBoard();
+                        sendMove();
+                        return true;  // Indicate that a road was drawn
+                    }
+                }
             }
         }
     }
     return false;
 });
-
-function rollDice(ctx) {
-    const dice1Value = Math.floor(Math.random() * 6) + 1;
-    const dice2Value = Math.floor(Math.random() * 6) + 1;
-    diceValues = [dice1Value, dice2Value];
-    drawBoard();
-}
-
-rollDice(ctx);
-// DICE ROLLING END
 
 // DRAW CARDS START
 

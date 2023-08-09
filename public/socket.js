@@ -16,6 +16,10 @@ export function endTurn() {
     socket.emit('end-turn', getGameState().id);
 }
 
+export function rollDice() {
+    socket.emit('roll-dice', getGameState().id);
+}
+
 export function getPlayerWithCurrentTurn() {
     const gameState = getGameState();
     if (gameState.currentState === "LOBBY") return null;
@@ -30,7 +34,6 @@ export function isPlayersTurn() {
 }
 
 socket.on('update-game-state', (gameState) => {
-    console.log(gameState.gameState.currentTurnIndex);
     setGameState(gameState);
     drawBoard();
 });
@@ -39,6 +42,11 @@ socket.on('joined-room', (gameState) => {
     setGameState(gameState);
     setPlayerColor(gameState.players.find(({ id }) => id === socket.id).color);
     drawInitialBoard();
+});
+
+socket.on('dice-rolled', (gameState) => {
+    setGameState(gameState);
+    drawBoard();
 });
 
 socket.emit('join-room');
