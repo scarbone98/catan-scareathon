@@ -26,6 +26,12 @@ const cardWidth = 50;
 const cardHeight = 80;
 const cardSpacing = 10;
 
+export let hexHighlightData = {
+    number: 0,
+    shouldHighlight: false,
+    timeout: null
+}
+
 canvas.addEventListener('click', buttonClicked);
 canvas.addEventListener('click', cardClicked);
 
@@ -52,6 +58,7 @@ function buttonClicked(event) {
 }
 
 function cardClicked(event) {
+    if (!isPlayersTurn()) return;
     const rect = canvas.getBoundingClientRect();
     const xClick = event.clientX - rect.left;
     const yClick = event.clientY - rect.top;
@@ -79,6 +86,36 @@ export function drawBoard() {
         drawHex(x, y, resource);
     }
 
+    let tokenIndex = 0;
+    // Draw tile tokens
+    hexes.forEach((tile, index) => {
+        if (gameState.tokenDistribution[tokenIndex] && gameState.desertIndex !== index) {  // Ensure there's a token for this tile (excludes desert)
+            drawToken(ctx, tile.x, tile.y, 20, gameState.tokenDistribution[tokenIndex]);
+            tokenIndex += 1;
+        }
+    });
+
+    // Highlight for whenever a dice is rolled
+    if (hexHighlightData.shouldHighlight) {
+        tokenIndex = 0;
+        hexes.forEach((tile, index) => {
+            if (gameState.tokenDistribution[tokenIndex] === hexHighlightData.number) {  // Ensure there's a token for this tile (excludes desert)
+                drawHex(tile.x, tile.y, tile.resource, true);
+                if (!hexHighlightData.timeout) {
+                    hexHighlightData.timeout = setTimeout(() => {
+                        hexHighlightData.timeout = null;
+                        hexHighlightData.shouldHighlight = false;
+                        hexHighlightData.number = 0;
+                        drawBoard();
+                    }, 1500);
+                }
+            }
+            if (gameState.desertIndex !== index) {
+                tokenIndex += 1;
+            }
+        });
+    }
+
     // Draw robber
     for (let i = 0; i < hexes.length; i++) {
         if (i === gameState.robberIndex) {
@@ -93,15 +130,6 @@ export function drawBoard() {
     for (let { x, y, color } of gameState.settlements) {
         drawSettlement(x, y, color);
     }
-
-    let tokenIndex = 0;
-    // Draw tile tokens
-    hexes.forEach((tile, index) => {
-        if (gameState.tokenDistribution[tokenIndex] && gameState.desertIndex !== index) {  // Ensure there's a token for this tile (excludes desert)
-            drawToken(ctx, tile.x, tile.y, 20, gameState.tokenDistribution[tokenIndex]);
-            tokenIndex += 1;
-        }
-    });
 
     // Draw dice
     if (gameState.diceValues) {
@@ -136,14 +164,18 @@ export function drawBoard() {
     }
 }
 
-function drawHex(x, y, resource) {
+function drawHex(x, y, resource, isHighlight = false) {
     ctx.beginPath();
     for (let i = 0; i < 6; i++) {
         ctx.lineTo(x + hexSize * Math.cos((i * 60 + 30) * Math.PI / 180),
             y + hexSize * Math.sin((i * 60 + 30) * Math.PI / 180));  // Added 30 degrees here
     }
     ctx.closePath();
-    ctx.fillStyle = resourceColors[resource];
+    if (isHighlight) {
+        ctx.fillStyle = "rgba(0, 0, 0, 0.5)";
+    } else {
+        ctx.fillStyle = resourceColors[resource];
+    }
     ctx.fill();
 }
 

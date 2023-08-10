@@ -1,5 +1,5 @@
 import { setGameState, drawInitialBoard, setPlayerColor, getGameState } from "./main.js";
-import { drawBoard } from "./canvas.js";
+import { drawBoard, hexHighlightData } from "./canvas.js";
 
 export const socket = io.connect('/');
 
@@ -46,6 +46,10 @@ socket.on('joined-room', (gameState) => {
 
 socket.on('dice-rolled', (gameState) => {
     setGameState(gameState);
+    document.getElementById('dice-roll').play();
+    hexHighlightData.timeout = null;
+    hexHighlightData.number = gameState.gameState.diceValues[0] + gameState.gameState.diceValues[1];
+    hexHighlightData.shouldHighlight = true;
     drawBoard();
 });
 

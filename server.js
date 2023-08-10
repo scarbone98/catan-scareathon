@@ -81,9 +81,13 @@ io.on('connection', (socket) => {
                 room.gameState.diceValues = [1, 1];
                 room.gameState.currentTurnIndex = 0;
             } else {
-                if (room.gameState.currentTurnIndex >= room.players.length - 1) {
+                if (room.gameState.setupTurnCount === room.players.length) {
+                    room.gameState.currentTurnIndex = room.gameState.currentTurnIndex;
+                }
+                else if (room.gameState.setupTurnCount > room.players.length) {
                     room.gameState.currentTurnIndex = Math.max(room.gameState.currentTurnIndex - 1, 0);
-                } else {
+                }
+                else {
                     room.gameState.currentTurnIndex = room.gameState.currentTurnIndex + 1;
                 }
                 room.gameState.setupTurnCount += 1;
