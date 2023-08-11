@@ -19,14 +19,13 @@ const resourceImages = {
 };
 
 const resourceColors = {
-    'WOOD': "assets/woods.png",
-    'BRICK': 'assets/brick.png',
-    'WHEAT': 'assets/wheat.png',
-    'SHEEP': 'assets/bones.png',
-    'ROCK': 'assets/stone.png',
+    'WOOD': '#228B22',
+    'BRICK': '#B22222',
+    'WHEAT': '#FFD700',
+    'SHEEP': '#ADFF2F',
+    'ROCK': '#808080',
     'DESERT': '#000'
-}
-
+};
 
 const canvas = document.getElementById('catanBoard');
 const ctx = canvas.getContext('2d');
