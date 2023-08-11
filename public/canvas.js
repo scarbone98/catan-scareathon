@@ -9,14 +9,22 @@ import {
 } from "./main.js";
 import { startGame, isPlayersTurn, endTurn, getPlayerWithCurrentTurn, rollDice, socket, discardCards } from "./socket.js";
 
-const resourceImages = {
-    'WOOD': "assets/woods.png",
-    'BRICK': 'assets/brick.png',
-    'WHEAT': 'assets/wheat.png',
-    'SHEEP': 'assets/graveyard.png',
-    'ROCK': 'assets/stone.png',
-    'DESERT': '#000'
-};
+
+const resources = [
+    { name: 'WOOD', url: 'assets/woods.png' },
+    { name: 'BRICK', url: 'assets/brick.png' },
+    { name: 'WHEAT', url: 'assets/wheat.png' },
+    { name: 'SHEEP', url: 'assets/graveyard.png' },
+    { name: 'ROCK', url: 'assets/stone.png' },
+];
+const resourceImages = {};
+
+for (let { name, url } of resources) {
+    const image = new Image();
+    image.src = url;
+    resourceImages[name] = image;
+}
+
 
 const resourceColors = {
     'WOOD': '#228B22',
@@ -127,7 +135,7 @@ export function drawBoard() {
             tokenIndex += 1;
         }
     });
-    console.log({hexes});
+
     // Draw the board
     for (let { x, y, resource, tokenValue } of hexes) {
         drawHex(x, y, resource, tokenValue);
@@ -221,13 +229,10 @@ function drawHex(x, y, resource, tokenValue, isHighlight = false) {
     } else {
         ctx.fillStyle = resourceColors[resource];
     }
-
     ctx.fill();
 
-    if (resourceImages[resource].charAt(0) !== "#" && !isHighlight) {
-        const hexImage = new Image();
-        hexImage.src = resourceImages[resource];
-        ctx.drawImage(hexImage, x - Math.sqrt(3) / 2 * hexSize, y - hexSize, Math.sqrt(3) / 2 * hexSize * 2, hexSize * 2);
+    if (resourceImages[resource] && !isHighlight) {
+        ctx.drawImage(resourceImages[resource], x - Math.sqrt(3) / 2 * hexSize, y - hexSize, Math.sqrt(3) / 2 * hexSize * 2, hexSize * 2);
     }
 
     drawToken(ctx, x, y, 26, tokenValue || '');
