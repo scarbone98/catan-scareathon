@@ -31,7 +31,7 @@ io.on('connection', (socket) => {
 
         let roomToJoin = null;
         for (let key of Object.keys(rooms)) {
-            if (rooms[key].players.length < 4) {
+            if (rooms[key].players.length < 4 && rooms[roomToJoin].gameState.currentState === 'LOBBY') {
                 roomToJoin = key;
                 break;
             }
@@ -48,6 +48,7 @@ io.on('connection', (socket) => {
             }];
             rooms[roomToJoin].gameState = initializeGameState();
             rooms[roomToJoin].id = roomToJoin;
+
         } else if (rooms[roomToJoin].gameState.currentState === 'LOBBY') {
             // Filter out remaining colors
             colors = colors.filter(color => !rooms[roomToJoin].players.find(player => player.color === color));

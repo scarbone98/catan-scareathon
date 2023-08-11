@@ -13,7 +13,7 @@ const resourceImages = {
     'WOOD': "assets/woods.png",
     'BRICK': 'assets/brick.png',
     'WHEAT': 'assets/wheat.png',
-    'SHEEP': 'assets/bones.png',
+    'SHEEP': 'assets/graveyard.png',
     'ROCK': 'assets/stone.png',
     'DESERT': '#000'
 };
@@ -127,7 +127,7 @@ export function drawBoard() {
             tokenIndex += 1;
         }
     });
-
+    console.log({hexes});
     // Draw the board
     for (let { x, y, resource, tokenValue } of hexes) {
         drawHex(x, y, resource, tokenValue);
@@ -206,6 +206,7 @@ export function drawBoard() {
 }
 
 function drawHex(x, y, resource, tokenValue, isHighlight = false) {
+    console.log(resource);
     ctx.beginPath();
     for (let i = 0; i < 6; i++) {
         ctx.lineTo(

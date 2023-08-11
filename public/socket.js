@@ -72,7 +72,7 @@ socket.on('update-game-state', (gameState) => {
 
 socket.on('joined-room', (gameState) => {
     setGameState(gameState);
-    setPlayerColor(gameState.players.find(({ id }) => id === socket.id).color);
+    setPlayerColor(gameState.players.find(({ id }) => id === socket.id)?.color);
     drawInitialBoard();
 });
 
