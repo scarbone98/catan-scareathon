@@ -158,6 +158,12 @@ function getAdjacentHexes(x, y) {
 function hasCardsSelected(target) {
     let targetCount = {};
     switch (target) {
+        case 'ROAD':
+            targetCount = {
+                'BRICK': 1,
+                'WOOD': 1
+            }
+            break;
         case 'SETTLEMENT':
             targetCount = {
                 'WHEAT': 1,
@@ -339,7 +345,7 @@ function pointToLineSegmentDistance(x, y, x1, y1, x2, y2) {
 // ROAD CLICKED 
 const edgeClickThreshold = 5; // distance in pixels to detect click near an edge
 canvas.addEventListener('pointerdown', function (event) {
-    if (gameState.currentState === "LOBBY" || !isPlayersTurn()) return;
+    if (gameState.currentState === "LOBBY" || !isPlayersTurn() || (!hasCardsSelected('ROAD') && gameState.currentState !== "SETUP")) return;
     const x = event.clientX - canvas.offsetLeft;
     const y = event.clientY - canvas.offsetTop;
 
