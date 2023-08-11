@@ -1,7 +1,23 @@
 import { setGameState, drawInitialBoard, setPlayerColor, getGameState } from "./main.js";
 import { drawBoard, hexHighlightData } from "./canvas.js";
 
-export const socket = io.connect('/');
+
+
+
+export let username = localStorage.getItem('username');
+
+// Get username
+while (!username) {
+    username = prompt('Enter a username');
+    if (username) {
+        localStorage.setItem('username', username);
+    }
+}
+
+
+export const socket = io.connect('/', {
+    query: { username }
+});
 
 // Emit a move to the server
 export function sendMove() {
@@ -34,6 +50,7 @@ export function isPlayersTurn() {
 }
 
 socket.on('update-game-state', (gameState) => {
+    window.gameState = gameState;
     setGameState(gameState);
     drawBoard();
 });
@@ -51,6 +68,10 @@ socket.on('dice-rolled', (gameState) => {
     hexHighlightData.number = gameState.gameState.diceValues[0] + gameState.gameState.diceValues[1];
     hexHighlightData.shouldHighlight = true;
     drawBoard();
+});
+
+socket.on('discard-cards', ({ amount }) => {
+    console.log(amount);
 });
 
 socket.emit('join-room');

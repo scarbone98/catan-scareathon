@@ -17,6 +17,9 @@ export let gameState = {
     playerOrder: []
 }
 
+
+window.gameState = gameState;
+
 export let players = [];
 
 export let playerColor = 'WHITE';

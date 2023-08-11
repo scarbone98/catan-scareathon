@@ -40,13 +40,23 @@ io.on('connection', (socket) => {
         if (!roomToJoin) {
             roomToJoin = uuidv4();
             rooms[roomToJoin] = {};
-            rooms[roomToJoin].players = [{ id: socket.id, color: colors[Math.floor(Math.random() * colors.length)], cards: [] }];
+            rooms[roomToJoin].players = [{
+                id: socket.id,
+                username: socket.handshake.query.username || 'unknown',
+                color: colors[Math.floor(Math.random() * colors.length)],
+                cards: []
+            }];
             rooms[roomToJoin].gameState = initializeGameState();
             rooms[roomToJoin].id = roomToJoin;
         } else if (rooms[roomToJoin].gameState.currentState === 'LOBBY') {
             // Filter out remaining colors
             colors = colors.filter(color => !rooms[roomToJoin].players.find(player => player.color === color));
-            rooms[roomToJoin].players.push({ id: socket.id, color: colors[Math.floor(Math.random() * colors.length)], cards: [] });
+            rooms[roomToJoin].players.push({
+                id: socket.id,
+                username: socket.handshake.query.username || 'unknown',
+                color: colors[Math.floor(Math.random() * colors.length)],
+                cards: []
+            });
         }
 
         playerToRoomMap[socket.id] = roomToJoin;
@@ -114,7 +124,16 @@ io.on('connection', (socket) => {
 
         const rolledNumber = dice1 + dice2;
 
-        console.log(rooms[id].players[0].cards);
+        // // KNIGHT
+        // if (rolledNumber === 7) {
+        //     rooms[id].gameState.currentState = "PLAYER-TURN-KNIGHT";
+        //     for (let player of rooms[id].players) {
+        //         if (player.cards.length > 7) {
+        //             io.to(player.id).emit('discard-cards', { amount: Math.floor(player.cards.length / 2) })
+        //         }
+        //     }
+        //     return;
+        // }
 
         for (let settlement of rooms[id].gameState.settlements) {
             for (let adjacentResouce of settlement.adjacentResources) {
@@ -150,7 +169,7 @@ io.on('connection', (socket) => {
         const roomId = playerToRoomMap[socket.id];
         if (!rooms[roomId]) return;
 
-        rooms[roomId].players = rooms[roomId]?.players?.filter(player => player === socket.id);
+        rooms[roomId].players = rooms[roomId]?.players?.filter(player => player.id !== socket.id);
         if (rooms[roomId].players.length <= 0) {
             delete rooms[roomId];
         } else {

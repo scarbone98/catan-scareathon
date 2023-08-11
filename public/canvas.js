@@ -147,7 +147,7 @@ export function drawBoard() {
     // Draw player cards
     for (let i = 0; i < players.length; i++) {
         const currentPlayer = players[i];
-        drawPlayerCard({ x: canvas.width / 2 + 200, y: 100 * i + 10, name: 'test', color: currentPlayer.color, id: currentPlayer.id, cards: currentPlayer.cards });
+        drawPlayerCard({ x: canvas.width / 2 + 200, y: 100 * i + 10, name: currentPlayer.username, color: currentPlayer.color, id: currentPlayer.id, cards: currentPlayer.cards });
     }
 
     // Draw buttons
