@@ -50,7 +50,7 @@ io.on('connection', (socket) => {
             rooms[roomToJoin].id = roomToJoin;
         } else if (rooms[roomToJoin].gameState.currentState === 'LOBBY') {
             // Filter out remaining colors
-            colors = colors.filter(color => !!rooms[roomToJoin].players.find(player => player.color === color));
+            colors = colors.filter(color => !rooms[roomToJoin].players.find(player => player.color === color));
             rooms[roomToJoin].players.push({
                 id: socket.id,
                 username: socket.handshake.query.username || 'unknown',

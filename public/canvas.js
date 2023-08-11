@@ -9,7 +9,7 @@ import {
 } from "./main.js";
 import { startGame, isPlayersTurn, endTurn, getPlayerWithCurrentTurn, rollDice, socket, discardCards } from "./socket.js";
 
-const resourceColors = {
+const resourceImages = {
     'WOOD': "assets/woods.png",
     'BRICK': 'assets/brick.png',
     'WHEAT': 'assets/wheat.png',
@@ -17,6 +17,15 @@ const resourceColors = {
     'ROCK': 'assets/stone.png',
     'DESERT': '#000'
 };
+
+const resourceColors = {
+    'WOOD': "assets/woods.png",
+    'BRICK': 'assets/brick.png',
+    'WHEAT': 'assets/wheat.png',
+    'SHEEP': 'assets/bones.png',
+    'ROCK': 'assets/stone.png',
+    'DESERT': '#000'
+}
 
 
 const canvas = document.getElementById('catanBoard');
@@ -215,9 +224,9 @@ function drawHex(x, y, resource, tokenValue, isHighlight = false) {
 
     ctx.fill();
 
-    if (resourceColors[resource].charAt(0) !== "#" && !isHighlight) {
+    if (resourceImages[resource].charAt(0) !== "#" && !isHighlight) {
         const hexImage = new Image();
-        hexImage.src = resourceColors[resource];
+        hexImage.src = resourceImages[resource];
         ctx.drawImage(hexImage, x - Math.sqrt(3) / 2 * hexSize, y - hexSize, Math.sqrt(3) / 2 * hexSize * 2, hexSize * 2);
     }
 
@@ -331,14 +340,14 @@ function drawRoad(start, end, color) {
     ctx.beginPath();
     ctx.moveTo(start.x, start.y);
     ctx.lineTo(end.x, end.y);
-    ctx.lineWidth = 8;
+    ctx.lineWidth = 12;
     ctx.strokeStyle = color;  // Brown for the road
     ctx.stroke();
     ctx.lineWidth = 1;  // Reset lineWidth for other drawings
 }
 
 function drawSettlement(x, y, color) {
-    const circleRadius = 10;
+    const circleRadius = 15;
     ctx.fillStyle = color; // Gold color for the settlement
     ctx.beginPath();
     ctx.arc(x, y, circleRadius, 0, 2 * Math.PI);
