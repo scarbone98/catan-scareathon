@@ -31,7 +31,7 @@ io.on('connection', (socket) => {
 
         let roomToJoin = null;
         for (let key of Object.keys(rooms)) {
-            if (rooms[key].players.length < 4 && rooms[roomToJoin].gameState.currentState === 'LOBBY') {
+            if (rooms[key].players.length < 4 && rooms[key].gameState.currentState === 'LOBBY') {
                 roomToJoin = key;
                 break;
             }
