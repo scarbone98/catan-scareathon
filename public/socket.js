@@ -1,5 +1,5 @@
 import { setGameState, drawInitialBoard, setPlayerColor, getGameState } from "./main.js";
-import { drawBoard, hexHighlightData } from "./canvas.js";
+import { drawBoard, hexHighlightData, discardCardsData } from "./canvas.js";
 
 
 
@@ -36,6 +36,10 @@ export function rollDice() {
     socket.emit('roll-dice', getGameState().id);
 }
 
+export function discardCards(newCards) {
+    socket.emit('discard-cards', { roomId: getGameState().id, newCards });
+}
+
 export function getPlayerWithCurrentTurn() {
     const gameState = getGameState();
     if (gameState.currentState === "LOBBY") return null;
@@ -52,6 +56,17 @@ export function isPlayersTurn() {
 socket.on('update-game-state', (gameState) => {
     window.gameState = gameState;
     setGameState(gameState);
+
+    const areWeDiscardingCards = gameState.gameState.playersDiscardingCards.find(({ playerId }) => playerId === socket.id);
+
+    discardCardsData.areWeDiscarding = false;
+    discardCardsData.amount = 0;
+
+    if (areWeDiscardingCards) {
+        discardCardsData.areWeDiscarding = !!areWeDiscardingCards;
+        discardCardsData.amount = areWeDiscardingCards.amount;
+    }
+
     drawBoard();
 });
 
@@ -63,15 +78,33 @@ socket.on('joined-room', (gameState) => {
 
 socket.on('dice-rolled', (gameState) => {
     setGameState(gameState);
-    document.getElementById('dice-roll').play();
+
+    const diceRollAudio = document.getElementById('dice-roll');
+    diceRollAudio.pause();
+    diceRollAudio.currentTime = 0;
+    diceRollAudio.play();
+
     hexHighlightData.timeout = null;
     hexHighlightData.number = gameState.gameState.diceValues[0] + gameState.gameState.diceValues[1];
     hexHighlightData.shouldHighlight = true;
     drawBoard();
 });
 
-socket.on('discard-cards', ({ amount }) => {
-    console.log(amount);
+socket.on('knight-rolled', (gameState) => {
+    setGameState(gameState);
+    const diceRollAudio = document.getElementById('dice-roll');
+    diceRollAudio.pause();
+    diceRollAudio.currentTime = 0;
+    diceRollAudio.play();
+
+    const areWeDiscardingCards = gameState.gameState.playersDiscardingCards.find(({ playerId }) => playerId === socket.id);
+
+    if (areWeDiscardingCards) {
+        discardCardsData.areWeDiscarding = !!areWeDiscardingCards;
+        discardCardsData.amount = areWeDiscardingCards.amount;
+    }
+
+    drawBoard();
 });
 
 socket.emit('join-room');

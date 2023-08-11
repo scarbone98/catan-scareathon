@@ -50,7 +50,7 @@ io.on('connection', (socket) => {
             rooms[roomToJoin].id = roomToJoin;
         } else if (rooms[roomToJoin].gameState.currentState === 'LOBBY') {
             // Filter out remaining colors
-            colors = colors.filter(color => !rooms[roomToJoin].players.find(player => player.color === color));
+            colors = colors.filter(color => !!rooms[roomToJoin].players.find(player => player.color === color));
             rooms[roomToJoin].players.push({
                 id: socket.id,
                 username: socket.handshake.query.username || 'unknown',
@@ -123,17 +123,22 @@ io.on('connection', (socket) => {
         const playerToCardsMap = {};
 
         const rolledNumber = dice1 + dice2;
+        // const rolledNumber = 7;
 
-        // // KNIGHT
-        // if (rolledNumber === 7) {
-        //     rooms[id].gameState.currentState = "PLAYER-TURN-KNIGHT";
-        //     for (let player of rooms[id].players) {
-        //         if (player.cards.length > 7) {
-        //             io.to(player.id).emit('discard-cards', { amount: Math.floor(player.cards.length / 2) })
-        //         }
-        //     }
-        //     return;
-        // }
+
+        // KNIGHT
+        if (rolledNumber === 7) {
+            rooms[id].gameState.currentState = "PLAYER-TURN-KNIGHT";
+            const playersDiscardingCards = [];
+            for (let player of rooms[id].players) {
+                if (player.cards.length > 7) {
+                    playersDiscardingCards.push({ amount: Math.floor(player.cards.length / 2), playerId: player.id });
+                }
+            }
+            rooms[id].gameState.playersDiscardingCards = playersDiscardingCards;
+            io.to(id).emit('knight-rolled', rooms[id]);
+            return;
+        }
 
         for (let settlement of rooms[id].gameState.settlements) {
             for (let adjacentResouce of settlement.adjacentResources) {
@@ -164,12 +169,23 @@ io.on('connection', (socket) => {
         io.to(gameState.id).emit('update-game-state', rooms[gameState.id]);
     });
 
+    socket.on('discard-cards', ({ roomId, newCards }) => {
+        if (!rooms[roomId]) return;
+        const room = rooms[roomId];
+        const player = room.players.find(player => player.id === socket.id);
+        player.cards = newCards;
+        room.gameState.playersDiscardingCards = room.gameState.playersDiscardingCards.filter(({ playerId }) => playerId !== socket.id);
+        io.to(roomId).emit('update-game-state', room);
+    });
+
     socket.on('disconnect', () => {
         console.log('user disconnected');
         const roomId = playerToRoomMap[socket.id];
         if (!rooms[roomId]) return;
 
         rooms[roomId].players = rooms[roomId]?.players?.filter(player => player.id !== socket.id);
+        rooms[roomId].gameState.playerOrder = rooms[roomId].gameState?.playerOrder?.filter(player => player.id !== socket.id);
+
         if (rooms[roomId].players.length <= 0) {
             delete rooms[roomId];
         } else {

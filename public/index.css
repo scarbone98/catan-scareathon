@@ -4,3 +4,8 @@
     justify-content: center;
     overflow: hidden;
 }
+
+@font-face {
+    font-family: 'Arcade';
+    src: url('assets/Arcade.ttf');
+}

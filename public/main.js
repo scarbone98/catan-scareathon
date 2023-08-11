@@ -35,7 +35,7 @@ export let selectedCards = {};
 export const tokenDistribution = [];
 export const arrangedTiles = [];
 
-export const hexSize = 70;
+export const hexSize = 100;
 
 const hexWidth = Math.sqrt(3) * hexSize;
 const hexHeight = 2 * hexSize;
@@ -80,8 +80,9 @@ export function drawInitialBoard() {
         }
 
         for (let col = 0; col < cols; col++) {
-            const x = (col * 1.35 + startColOffset) * hexWidth * .75 + leftOffset + 200;
-            const y = vertDist * row * 0.825 * 1.25 + 100;
+            const x = (col * 1.33 + startColOffset) * hexWidth * .75 + leftOffset + 200;
+            const y = vertDist * row * 0.75
+                * 1.25 + 100;
             const resource = gameState.arrangedTiles[resourceMapIndex];
             hexes.push({ x, y, resource });
             resourceMapIndex++;
@@ -204,7 +205,7 @@ export const setupState = {
 }
 
 // SETTLEMENT PLACEMENT
-canvas.addEventListener('click', function (event) {
+canvas.addEventListener('pointerdown', function (event) {
     if (gameState.currentState === "LOBBY" || !isPlayersTurn() || (!hasCardsSelected('SETTLEMENT') && gameState.currentState !== "SETUP")) return;
 
     const x = event.clientX - canvas.offsetLeft;
@@ -212,8 +213,8 @@ canvas.addEventListener('click', function (event) {
 
     for (let hex of hexes) {
         for (let angle of [30, 90, 150, 210, 270, 330]) {
-            const cornerX = hex.x + hexSize * Math.cos(degreesToRadians(angle));
-            const cornerY = hex.y + hexSize * Math.sin(degreesToRadians(angle));
+            const cornerX = hex.x + (hexSize - 2.5) * Math.cos(degreesToRadians(angle));
+            const cornerY = hex.y + (hexSize - 2.5) * Math.sin(degreesToRadians(angle));
 
             const dx = x - cornerX;
             const dy = y - cornerY;
@@ -223,7 +224,7 @@ canvas.addEventListener('click', function (event) {
                 if (isValidSettlementLocation(cornerX, cornerY)) {
                     if (gameState.currentState === "SETUP" && !setupState.placedSetupSettlement) {
                         const adjacentResources = getAdjacentHexes(cornerX, cornerY);
-                        gameState.settlements.push({ x: cornerX, y: cornerY, color: playerColor, adjacentResources, owner: socket.id });
+                        gameState.settlements.push({ x: cornerX, y: cornerY - 5, color: playerColor, adjacentResources, owner: socket.id });
                         drawBoard();
                         sendMove();
                         setupState.placedSetupSettlement = true;
@@ -250,8 +251,8 @@ function getEdgePoints(hex) {
     let edges = [];
     let previousPoint = null;
     for (let angle of [30, 90, 150, 210, 270, 330, 390]) {  // Note the 390 to loop back to the start
-        const cornerX = hex.x + hexSize * Math.cos(degreesToRadians(angle));
-        const cornerY = hex.y + hexSize * Math.sin(degreesToRadians(angle));
+        const cornerX = hex.x + (hexSize - 2.5) * Math.cos(degreesToRadians(angle));
+        const cornerY = hex.y + (hexSize - 5) * Math.sin(degreesToRadians(angle));
         if (previousPoint) {
             edges.push([previousPoint, { x: cornerX, y: cornerY }]);
         }
@@ -293,6 +294,7 @@ function distanceToSegment(p, v, w) {
 }
 
 function isNearRoad(x, y) {
+    if (isPlayersTurn() && gameState.currentState === "SETUP") return false;
     for (let road of gameState.roads) {
         const distance = distanceToSegment({ x, y }, road.start, road.end);
         if (distance < 10 && playerColor === road.color) {  // Threshold for adjacency
@@ -336,7 +338,7 @@ function pointToLineSegmentDistance(x, y, x1, y1, x2, y2) {
 
 // ROAD CLICKED 
 const edgeClickThreshold = 5; // distance in pixels to detect click near an edge
-canvas.addEventListener('click', function (event) {
+canvas.addEventListener('pointerdown', function (event) {
     if (gameState.currentState === "LOBBY" || !isPlayersTurn()) return;
     const x = event.clientX - canvas.offsetLeft;
     const y = event.clientY - canvas.offsetTop;

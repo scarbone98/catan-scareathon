@@ -33,7 +33,7 @@ function initializeGameState() {
     let settlements = [];
     let diceValues = null;
     let robberIndex = 0;
-
+    let playersDiscardingCards = [];
 
     // Board setup stuff
     const tokenDistribution = shuffle([2, 3, 3, 4, 4, 5, 5, 6, 6, 8, 8, 9, 9, 10, 10, 11, 11, 12]);
@@ -51,7 +51,8 @@ function initializeGameState() {
         robberIndex,
         desertIndex,
         tokenDistribution,
-        arrangedTiles
+        arrangedTiles,
+        playersDiscardingCards
     }
 }
 

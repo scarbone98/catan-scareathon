@@ -7,20 +7,22 @@ import {
     canEndTurn,
     setupState
 } from "./main.js";
-import { startGame, isPlayersTurn, endTurn, getPlayerWithCurrentTurn, rollDice, socket } from "./socket.js";
+import { startGame, isPlayersTurn, endTurn, getPlayerWithCurrentTurn, rollDice, socket, discardCards } from "./socket.js";
 
 const resourceColors = {
-    'WOOD': '#228B22',
-    'BRICK': '#B22222',
-    'WHEAT': '#FFD700',
-    'SHEEP': '#ADFF2F',
-    'ROCK': '#808080',
+    'WOOD': "assets/woods.png",
+    'BRICK': 'assets/brick.png',
+    'WHEAT': 'assets/wheat.png',
+    'SHEEP': 'assets/bones.png',
+    'ROCK': 'assets/stone.png',
     'DESERT': '#000'
 };
 
 
 const canvas = document.getElementById('catanBoard');
 const ctx = canvas.getContext('2d');
+
+ctx.imageSmoothingEnabled = false;
 
 const cardWidth = 50;
 const cardHeight = 80;
@@ -32,8 +34,16 @@ export let hexHighlightData = {
     timeout: null
 }
 
-canvas.addEventListener('click', buttonClicked);
-canvas.addEventListener('click', cardClicked);
+export let discardCardsData = {
+    areWeDiscarding: false,
+    amount: 0
+}
+
+const buttonLocations = {};
+
+canvas.addEventListener('pointerdown', buttonClicked);
+canvas.addEventListener('pointerdown', cardClicked);
+canvas.addEventListener('pointerdown', discardButtonClicked);
 
 function buttonClicked(event) {
     const rect = canvas.getBoundingClientRect();
@@ -58,7 +68,7 @@ function buttonClicked(event) {
 }
 
 function cardClicked(event) {
-    if (!isPlayersTurn()) return;
+    if (!isPlayersTurn() && !discardCardsData.areWeDiscarding) return;
     const rect = canvas.getBoundingClientRect();
     const xClick = event.clientX - rect.left;
     const yClick = event.clientY - rect.top;
@@ -77,30 +87,50 @@ function cardClicked(event) {
     }
 }
 
+function discardButtonClicked(event) {
+    const rect = canvas.getBoundingClientRect();
+    const x = event.clientX - rect.left;
+    const y = event.clientY - rect.top;
+
+    if (
+        x >= buttonLocations.discardButton?.xStart && x <= buttonLocations.discardButton?.xEnd
+        && y >= buttonLocations.discardButton?.yStart && y <= buttonLocations.discardButton?.yEnd
+    ) {
+        let playerCards = [...players.find(player => player.id === socket.id)?.cards];
+        for (let key of Object.keys({ ...selectedCards })) {
+            playerCards[key] = null;
+            delete selectedCards[key];
+        }
+        playerCards = playerCards.filter(card => card);
+        discardCards(playerCards);
+    }
+}
+
+
 export function drawBoard() {
     // Clear the whole board
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    // Draw the board
-    for (let { x, y, resource } of hexes) {
-        drawHex(x, y, resource);
-    }
 
     let tokenIndex = 0;
     // Draw tile tokens
     hexes.forEach((tile, index) => {
         if (gameState.tokenDistribution[tokenIndex] && gameState.desertIndex !== index) {  // Ensure there's a token for this tile (excludes desert)
-            drawToken(ctx, tile.x, tile.y, 20, gameState.tokenDistribution[tokenIndex]);
+            tile.tokenValue = gameState.tokenDistribution[tokenIndex];
             tokenIndex += 1;
         }
     });
+
+    // Draw the board
+    for (let { x, y, resource, tokenValue } of hexes) {
+        drawHex(x, y, resource, tokenValue);
+    }
 
     // Highlight for whenever a dice is rolled
     if (hexHighlightData.shouldHighlight) {
         tokenIndex = 0;
         hexes.forEach((tile, index) => {
             if (gameState.tokenDistribution[tokenIndex] === hexHighlightData.number) {  // Ensure there's a token for this tile (excludes desert)
-                drawHex(tile.x, tile.y, tile.resource, true);
+                drawHex(tile.x, tile.y, tile.resource, tile.tokenValue, true);
                 if (!hexHighlightData.timeout) {
                     hexHighlightData.timeout = setTimeout(() => {
                         hexHighlightData.timeout = null;
@@ -137,8 +167,8 @@ export function drawBoard() {
         const spacing = 20;  // Space between dice
 
         // Draw dice
-        drawDice(ctx, ctx.canvas.width / 2 - size - spacing / 2 + 250, ctx.canvas.height / 1.5 - size / 2, size, gameState.diceValues[0]);
-        drawDice(ctx, ctx.canvas.width / 2 + spacing / 2 + 250, ctx.canvas.height / 1.5 - size / 2, size, gameState.diceValues[1]);
+        drawDice(ctx, ctx.canvas.width / 2 - size - spacing / 2 + 450, ctx.canvas.height / 1.5 - size / 2, size, gameState.diceValues[0]);
+        drawDice(ctx, ctx.canvas.width / 2 + spacing / 2 + 450, ctx.canvas.height / 1.5 - size / 2, size, gameState.diceValues[1]);
         if (gameState.currentState === "ROLLING-DICE" && isPlayersTurn()) {
             drawRollDiceButton();
         }
@@ -147,7 +177,7 @@ export function drawBoard() {
     // Draw player cards
     for (let i = 0; i < players.length; i++) {
         const currentPlayer = players[i];
-        drawPlayerCard({ x: canvas.width / 2 + 200, y: 100 * i + 10, name: currentPlayer.username, color: currentPlayer.color, id: currentPlayer.id, cards: currentPlayer.cards });
+        drawPlayerCard({ x: canvas.width / 2 + 300, y: 105 * i + 10, name: currentPlayer.username, color: currentPlayer.color, id: currentPlayer.id, cards: currentPlayer.cards });
     }
 
     // Draw buttons
@@ -162,32 +192,73 @@ export function drawBoard() {
     for (let i = 0; i < playerCards?.length; i++) {
         drawCard(playerCards[i], i);
     }
+    if (discardCardsData.areWeDiscarding) {
+        drawDiscardButton();
+    }
 }
 
-function drawHex(x, y, resource, isHighlight = false) {
+function drawHex(x, y, resource, tokenValue, isHighlight = false) {
     ctx.beginPath();
     for (let i = 0; i < 6; i++) {
-        ctx.lineTo(x + hexSize * Math.cos((i * 60 + 30) * Math.PI / 180),
-            y + hexSize * Math.sin((i * 60 + 30) * Math.PI / 180));  // Added 30 degrees here
+        ctx.lineTo(
+            x + hexSize * Math.cos((i * 60 + 30) * Math.PI / 180),
+            y + hexSize * Math.sin((i * 60 + 30) * Math.PI / 180)
+        );  // Added 30 degrees here
     }
     ctx.closePath();
+
     if (isHighlight) {
         ctx.fillStyle = "rgba(0, 0, 0, 0.5)";
     } else {
         ctx.fillStyle = resourceColors[resource];
     }
+
     ctx.fill();
+
+    if (resourceColors[resource].charAt(0) !== "#" && !isHighlight) {
+        const hexImage = new Image();
+        hexImage.src = resourceColors[resource];
+        ctx.drawImage(hexImage, x - Math.sqrt(3) / 2 * hexSize, y - hexSize, Math.sqrt(3) / 2 * hexSize * 2, hexSize * 2);
+    }
+
+    drawToken(ctx, x, y, 26, tokenValue || '');
 }
 
+
+function drawDiscardButton() {
+    const playerCards = players.find(player => player.id === socket.id)?.cards;
+    ctx.fillStyle = '#0099ff';
+
+    if (Object.keys(selectedCards).length !== discardCardsData.amount) {
+        ctx.fillStyle = 'rgba(0,0,0,0.5)';
+    }
+
+    const x = (playerCards.length * (cardWidth + cardSpacing)) + cardSpacing;
+    const y = canvas.height / 1.15;
+
+    buttonLocations.discardButton = {
+        xStart: x,
+        yStart: y,
+        xEnd: x + 100,
+        yEnd: y + 100
+    };
+
+    ctx.fillRect(x, y, 100, 100);
+
+    ctx.font = '24px Arcade';
+    ctx.fillStyle = 'white';
+    ctx.textAlign = 'center';
+    ctx.fillText('Discard', x + 50, y + 50);
+}
 
 function drawPlayerCard({ x, y, name, color, id, cards }) {
     if (gameState.currentState !== "LOBBY" && id === getPlayerWithCurrentTurn().id) {
         ctx.fillStyle = "#000";
-        ctx.fillRect(x - 3, y - 3, 106, 106);
+        ctx.fillRect(x - 3, y - 3, 306, 106);
     }
     ctx.fillStyle = color;
-    ctx.fillRect(x, y, 100, 100);
-    ctx.font = '18px Arial';
+    ctx.fillRect(x, y, 300, 100);
+    ctx.font = '18px Arcade';
     ctx.fillStyle = 'white';
     ctx.textAlign = 'center';
     ctx.fillText(name, x + 50, y + 30);
@@ -197,7 +268,7 @@ function drawPlayerCard({ x, y, name, color, id, cards }) {
     if (cards.length > 7) {
         ctx.fillStyle = "red";
     }
-    ctx.font = '12px Arial';
+    ctx.font = '12px Arcade';
     ctx.fillText(cards.length, x + 15, y + 85);
 }
 
@@ -223,7 +294,7 @@ function drawEndTurnButton() {
     ctx.fillStyle = '#0099ff';
     ctx.fillRect(0, 0, 100, 100);
 
-    ctx.font = '24px Arial';
+    ctx.font = '24px Arcade';
     ctx.fillStyle = 'white';
     ctx.textAlign = 'center';
     ctx.fillText('End Turn', 50, 50);
@@ -233,7 +304,7 @@ function drawStartButton() {
     ctx.fillStyle = '#0099ff';
     ctx.fillRect(0, 0, 100, 100);
 
-    ctx.font = '24px Arial';
+    ctx.font = '24px Arcade';
     ctx.fillStyle = 'white';
     ctx.textAlign = 'center';
     ctx.fillText('Start', 50, 50);
@@ -243,19 +314,16 @@ function drawRollDiceButton() {
     ctx.fillStyle = '#0099ff';
     ctx.fillRect(0, 110, 100, 100);
 
-    ctx.font = '24px Arial';
+    ctx.font = '24px Arcade';
     ctx.fillStyle = 'white';
     ctx.textAlign = 'center';
     ctx.fillText('Roll Dice', 50, 160);
 }
 
 function drawRobber(x, y) {
-    const circleRadius = 15;
-    ctx.fillStyle = "#FFF"; // black color for the robber
-    ctx.beginPath();
-    ctx.arc(x, y, circleRadius, 0, 2 * Math.PI);
-    ctx.closePath();
-    ctx.fill();
+    const hexImage = new Image();
+    hexImage.src = "assets/Cthan.png";
+    ctx.drawImage(hexImage, x - Math.sqrt(3) / 2 * 70, y - 70, Math.sqrt(3) / 2 * 70 * 2, 70 * 2);
 }
 
 
@@ -315,8 +383,9 @@ function drawDice(ctx, x, y, size, value) {
 }
 
 function drawToken(ctx, x, y, size, value) {
-    ctx.fillStyle = (value === 6 || value === 8) ? 'red' : 'black';
-    ctx.font = `${size}px Arial`;
+    y -= 2;
+    ctx.fillStyle = (value === 6 || value === 8) ? 'gold' : 'maroon';
+    ctx.font = `${size}px Arcade`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText(value, x, y);
@@ -325,16 +394,16 @@ function drawToken(ctx, x, y, size, value) {
 
     let dotCount = probabilities[value];
     let dotRadius = 3; // or choose a suitable size
-    let spacing = 8; // adjust as needed
-
-    // Calculate starting position
-    let startX = x - ((dotCount - 1) * spacing) / 2;
-    let startY = y + 20; // some offset below the number
 
     for (let i = 0; i < dotCount; i++) {
+        const centerX = x;
+        const centerY = y;
+        const angle = ((i / dotCount) * Math.PI * 2) + Math.PI / 2;
+        const xPos = centerX + (25 / 70) * hexSize * Math.cos(angle);
+        const yPos = centerY + (25 / 70) * hexSize * Math.sin(angle);
+        ctx.fillStyle = (value === 6 || value === 8) ? 'gold' : 'maroon'; // or choose a color
         ctx.beginPath();
-        ctx.arc(startX + i * spacing, startY, dotRadius, 0, 2 * Math.PI);
-        ctx.fillStyle = 'black'; // or choose a color
+        ctx.arc(xPos, yPos, dotRadius, 0, Math.PI * 2);
         ctx.fill();
         ctx.closePath();
     }

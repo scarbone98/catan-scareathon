@@ -4,14 +4,23 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Catan Board</title>
+    <title>Settlers of C'than</title>
     <link rel="stylesheet" href="index.css">
+    <link rel="shortcut icon" type="image/x-icon" href="assets/favicon.ico"/>
+    <link rel="preload" href="assets/Arcade.ttf" as="font" type="font/ttf" crossorigin>
 </head>
 
 <body>
     <div class="canvas-container">
-        <canvas id="catanBoard" width="1200" height="800"></canvas>
+        <canvas id="catanBoard" width="1400" height="800"></canvas>
     </div>
+    <img src="assets/woods.png" alt="" hidden>
+    <img src="assets/wheat.png" alt="" hidden>
+    <img src="assets/stone.png" alt="" hidden>
+    <img src="assets/brick.png" alt="" hidden>
+    <img src="assets/bones.png" alt="" hidden>
+    <img src="assets/Cthan.png" alt="" hidden>
+
     <audio id="dice-roll">
         <source src="assets/dice-roll.mp3" type="audio/mpeg">
         Your browser does not support the audio element.
