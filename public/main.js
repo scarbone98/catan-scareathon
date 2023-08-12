@@ -1,4 +1,4 @@
-import { isPlayersTurn, sendMove, socket } from './socket.js';
+import { isPlayersTurn, moveKnight, sendMove, socket } from './socket.js';
 import { drawBoard } from "./canvas.js";
 
 const canvas = document.getElementById('catanBoard');
@@ -14,7 +14,16 @@ export let gameState = {
     id: null,
     currentState: 'LOBBY',
     currentTurnIndex: 0,
-    playerOrder: []
+    playerOrder: [],
+    playersDiscardingCards: [],
+    playersGettingRobbed: [],
+    bank: {
+        'WHEAT': 20,
+        'BRICK': 20,
+        'ROCK': 20,
+        'SHEEP': 20,
+        'WOOD': 20
+    }
 }
 
 
@@ -59,6 +68,7 @@ export function setPlayerColor(color) {
 export function drawInitialBoard() {
     // Drawing the board
     let resourceMapIndex = 0;
+    let tokenIndex = 0;
     let startColOffset = 2;
     for (let row = 0; row < 5; row++) {
         let cols;
@@ -84,7 +94,10 @@ export function drawInitialBoard() {
             const y = vertDist * row * 0.75
                 * 1.25 + 100;
             const resource = gameState.arrangedTiles[resourceMapIndex];
-            hexes.push({ x, y, resource });
+            hexes.push({ x, y, resource, tokenValue: resource === 'DESERT' ? 0 : gameState.tokenDistribution[tokenIndex] });
+            if (resource !== 'DESERT') {
+                tokenIndex += 1;
+            }
             resourceMapIndex++;
         }
 
@@ -149,7 +162,7 @@ function getAdjacentHexes(x, y) {
         const dy = y - hexes[i].y;
         const distance = Math.sqrt(dx * dx + dy * dy);
         if (distance < 1.5 * hexSize) {
-            adjacentHexes.push({ resource: hexes[i].resource, tokenNumber: gameState.tokenDistribution[getTokenDistributionIndex(i)] });
+            adjacentHexes.push({ resource: hexes[i].resource, tokenNumber: gameState.tokenDistribution[getTokenDistributionIndex(i)], hexIndex: i });
         }
     }
     return adjacentHexes;
@@ -199,6 +212,10 @@ function hasCardsSelected(target) {
 
 export function canEndTurn() {
     if (isPlayersTurn() && gameState.currentState === "SETUP" && (!setupState.placedSetupRoad || !setupState.placedSetupSettlement)) {
+        return false;
+    }
+    // Knight roll can't skip stealing and placing knight
+    if (isPlayersTurn() && (gameState.currentState === "PLAYER-STEALING-CARD" || gameState.currentState === "PLAYER-TURN-KNIGHT")) {
         return false;
     }
     return isPlayersTurn();
@@ -381,47 +398,47 @@ canvas.addEventListener('pointerdown', function (event) {
     return false;
 });
 
-// DRAW CARDS START
 
-// const cardWidth = 50;
-// const cardHeight = 80;
-// const cardSpacing = 10;
-// let cardsInHand = [];
 
-// function drawCard(resource) {
-//     const x = (cardsInHand.length * (cardWidth + cardSpacing)) + cardSpacing;
-//     const y = canvas.height - cardHeight - cardSpacing;
+// Hex clicked (for knight placement)
+canvas.addEventListener('pointerdown', function (event) {
+    if (gameState.currentState === "PLAYER-TURN-KNIGHT" && isPlayersTurn() && !gameState.playersDiscardingCards.length) {
+        const x = event.clientX - canvas.offsetLeft;
+        const y = event.clientY - canvas.offsetTop;
 
-//     ctx.fillStyle = resourceColors[resource];
-//     ctx.fillRect(x, y, cardWidth, cardHeight);
-//     ctx.strokeStyle = "#000";
-//     ctx.lineWidth = 2;
-//     ctx.strokeRect(x, y, cardWidth, cardHeight);
+        for (let i = 0; i < hexes.length; i++) {
+            const hex = hexes[i];
+            const corners = getHexCorners(hex.x, hex.y);
 
-//     cardsInHand.push(resource);
-// }
+            if (pointInHex(x, y, corners) && gameState.robberIndex !== i) {
+                // Hexagon is clicked, perform the desired action
+                moveKnight(i);
+                return;
+            }
+        }
+    }
+});
 
-// drawCard("wood")
-// drawCard("wood")
-// drawCard("wood")
-// drawCard("wood")
-// drawCard("wood")
-// drawCard("wood")
+function pointInHex(x, y, corners) {
+    let oddNodes = false;
+    let j = corners.length - 1;
 
-// canvas.addEventListener('click', function (event) {
-//     const x = event.clientX - canvas.offsetLeft;
-//     const y = event.clientY - canvas.offsetTop;
+    for (let i = 0; i < corners.length; i++) {
+        if (
+            (corners[i].y < y && corners[j].y >= y) ||
+            (corners[j].y < y && corners[i].y >= y)
+        ) {
+            if (
+                corners[i].x +
+                ((y - corners[i].y) / (corners[j].y - corners[i].y)) *
+                (corners[j].x - corners[i].x) <
+                x
+            ) {
+                oddNodes = !oddNodes;
+            }
+        }
+        j = i;
+    }
 
-//     // ... [existing corner and edge detection code]
-
-//     for (let hex of hexes) {
-//         const dx = x - hex.x;
-//         const dy = y - hex.y;
-//         const distance = Math.sqrt(dx * dx + dy * dy);
-
-//         if (distance < hexSize) {
-//             drawCard(hex.resource);
-//             return;
-//         }
-//     }
-// });
+    return oddNodes;
+}

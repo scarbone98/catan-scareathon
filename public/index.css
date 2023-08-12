@@ -3,6 +3,7 @@
     display: flex;
     justify-content: center;
     overflow: hidden;
+    font-family: 'Arcade';
 }
 
 @font-face {

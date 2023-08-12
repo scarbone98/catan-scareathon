@@ -124,8 +124,6 @@ io.on('connection', (socket) => {
         const playerToCardsMap = {};
 
         const rolledNumber = dice1 + dice2;
-        // const rolledNumber = 7;
-
 
         // KNIGHT
         if (rolledNumber === 7) {
@@ -147,8 +145,9 @@ io.on('connection', (socket) => {
                     if (!playerToCardsMap[settlement.owner]) {
                         playerToCardsMap[settlement.owner] = [];
                     }
-                    if (adjacentResouce.resource !== "DESERT") {
+                    if (adjacentResouce.resource !== "DESERT" && rooms[id].gameState.bank[adjacentResouce.resource] > 0) {
                         playerToCardsMap[settlement.owner].push(adjacentResouce.resource);
+                        rooms[id].gameState.bank[adjacentResouce.resource] -= 1;
                     }
                 }
             }
@@ -164,6 +163,71 @@ io.on('connection', (socket) => {
         io.to(id).emit('dice-rolled', rooms[id]);
     });
 
+    socket.on('move-knight', ({ roomId, hexIndex }) => {
+        if (!rooms[roomId]) return;
+        const room = rooms[roomId];
+        room.gameState.robberIndex = hexIndex;
+        room.gameState.currentState = "PLAYER-TURN";
+
+        const playersToStealFrom = [];
+        for (let { adjacentResources, owner } of room.gameState.settlements) {
+            const isSettlementAdjacentToRobber = adjacentResources.find((adjacentResource) => adjacentResource.hexIndex === hexIndex);
+
+            const ownerObject = room.players?.find(player => player.id === owner);
+
+            if (!ownerObject) {
+                continue;
+            }
+
+            const doesOwnerHaveCards = ownerObject.cards.length > 0;
+
+            if (doesOwnerHaveCards && isSettlementAdjacentToRobber && playersToStealFrom.indexOf(owner) < 0 && socket.id !== owner) {
+                playersToStealFrom.push(owner);
+            }
+        }
+
+        // Auto steal a random card from this player
+        if (playersToStealFrom.length === 1) {
+            // Remove the card form target player
+            const playerToStealFrom = room.players.find(player => player.id === playersToStealFrom[0]);
+            if (playerToStealFrom.cards.length > 0) {
+                const randomCardIndex = Math.floor(Math.random() * playerToStealFrom.cards.length);
+                const cardValue = playerToStealFrom.cards[randomCardIndex];
+                playerToStealFrom.cards = playerToStealFrom.cards.filter((_, index) => index !== randomCardIndex);
+
+                // Give player that moved the knight the card
+                const playerThatMovedKnight = room.players.find(player => player.id === socket.id);
+                playerThatMovedKnight.cards = [...playerThatMovedKnight.cards, cardValue];
+            }
+        }
+        // Player that rolled the knight will have to choose who to steal from
+        else if (playersToStealFrom.length > 1) {
+            // TODO THIS SHIT
+            room.gameState.currentState = "PLAYER-STEALING-CARD";
+            room.gameState.playersGettingRobbed = playersToStealFrom.map(playerId => room.players.find(player => player.id === playerId));
+        }
+
+        io.to(roomId).emit('update-game-state', rooms[roomId]);
+    });
+
+    socket.on('steal-card', ({ roomId, targetPlayerId }) => {
+        if (!rooms[roomId]) return;
+        const room = rooms[roomId];
+        // Remove the card form target player
+        const playerToStealFrom = room.players.find(player => player.id === targetPlayerId);
+        const randomCardIndex = Math.floor(Math.random() * playerToStealFrom.cards.length);
+        const cardValue = playerToStealFrom.cards[randomCardIndex];
+        playerToStealFrom.cards = playerToStealFrom.cards.filter((_, index) => index !== randomCardIndex);
+
+        // Give player that moved the knight the card
+        const playerThatMovedKnight = room.players.find(player => player.id === socket.id);
+        playerThatMovedKnight.cards = [...playerThatMovedKnight.cards, cardValue];
+
+        room.gameState.currentState = "PLAYER-TURN";
+
+        io.to(roomId).emit('update-game-state', rooms[roomId]);
+    });
+
     socket.on('make-move', (gameState) => {
         if (!rooms[gameState.id]) return;
         rooms[gameState.id].gameState = gameState;
@@ -174,6 +238,24 @@ io.on('connection', (socket) => {
         if (!rooms[roomId]) return;
         const room = rooms[roomId];
         const player = room.players.find(player => player.id === socket.id);
+
+        // We need to give the discarded cards back to the bank
+        const oldCards = player.cards;
+        const count = {};
+        for (let oldCard of oldCards) {
+            if (!count[oldCard]) {
+                count[oldCard] = 1;
+            } else {
+                count[oldCard] += 1;
+            }
+        }
+        for (let newCard of newCards) {
+            count[newCard] -= 1;
+        }
+        for (let resource of Object.keys(count)) {
+            room.gameState.bank[resource] += count[resource];
+        }
+
         player.cards = newCards;
         room.gameState.playersDiscardingCards = room.gameState.playersDiscardingCards.filter(({ playerId }) => playerId !== socket.id);
         io.to(roomId).emit('update-game-state', room);

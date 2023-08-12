@@ -7,7 +7,7 @@ import {
     canEndTurn,
     setupState
 } from "./main.js";
-import { startGame, isPlayersTurn, endTurn, getPlayerWithCurrentTurn, rollDice, socket, discardCards } from "./socket.js";
+import { startGame, isPlayersTurn, endTurn, getPlayerWithCurrentTurn, rollDice, socket, discardCards, stealCard } from "./socket.js";
 
 
 const resources = [
@@ -59,7 +59,8 @@ const buttonLocations = {};
 
 canvas.addEventListener('pointerdown', buttonClicked);
 canvas.addEventListener('pointerdown', cardClicked);
-canvas.addEventListener('pointerdown', discardButtonClicked);
+canvas.addEventListener('pointerdown', discardCardsButtonClicked);
+canvas.addEventListener('pointerdown', stealCardTargetClicked);
 
 function buttonClicked(event) {
     const rect = canvas.getBoundingClientRect();
@@ -103,7 +104,8 @@ function cardClicked(event) {
     }
 }
 
-function discardButtonClicked(event) {
+
+function discardCardsButtonClicked(event) {
     const rect = canvas.getBoundingClientRect();
     const x = event.clientX - rect.left;
     const y = event.clientY - rect.top;
@@ -123,18 +125,29 @@ function discardButtonClicked(event) {
 }
 
 
+function stealCardTargetClicked(event) {
+    if (isPlayersTurn() && gameState.currentState === "PLAYER-STEALING-CARD") {
+
+        const rect = canvas.getBoundingClientRect();
+        const xClick = event.clientX - rect.left;
+        const yClick = event.clientY - rect.top;
+
+        for (let i = 0; i < stealPlayerCardsPositions.length; i++) {
+            const { startX, endX, startY, endY, playerId } = stealPlayerCardsPositions[i];
+            if (xClick >= startX && xClick <= endX && yClick >= startY && yClick <= endY) {
+                stealCard(playerId);
+                stealPlayerCardsPositions = [];
+                return;
+            }
+        }
+
+    }
+}
+
+
 export function drawBoard() {
     // Clear the whole board
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    let tokenIndex = 0;
-    // Draw tile tokens
-    hexes.forEach((tile, index) => {
-        if (gameState.tokenDistribution[tokenIndex] && gameState.desertIndex !== index) {  // Ensure there's a token for this tile (excludes desert)
-            tile.tokenValue = gameState.tokenDistribution[tokenIndex];
-            tokenIndex += 1;
-        }
-    });
 
     // Draw the board
     for (let { x, y, resource, tokenValue } of hexes) {
@@ -143,7 +156,7 @@ export function drawBoard() {
 
     // Highlight for whenever a dice is rolled
     if (hexHighlightData.shouldHighlight) {
-        tokenIndex = 0;
+        let tokenIndex = 0;
         hexes.forEach((tile, index) => {
             if (gameState.tokenDistribution[tokenIndex] === hexHighlightData.number) {  // Ensure there's a token for this tile (excludes desert)
                 drawHex(tile.x, tile.y, tile.resource, tile.tokenValue, true);
@@ -193,7 +206,7 @@ export function drawBoard() {
     // Draw player cards
     for (let i = 0; i < players.length; i++) {
         const currentPlayer = players[i];
-        drawPlayerCard({ x: canvas.width / 2 + 300, y: 105 * i + 10, name: currentPlayer.username, color: currentPlayer.color, id: currentPlayer.id, cards: currentPlayer.cards });
+        drawPlayerCard({ x: canvas.width / 2 + 300, y: 105 * i + 10 + 150, name: currentPlayer.username, color: currentPlayer.color, id: currentPlayer.id, cards: currentPlayer.cards });
     }
 
     // Draw buttons
@@ -203,18 +216,28 @@ export function drawBoard() {
         drawEndTurnButton();
     }
 
-    // // Draw player resource cards
+    // Draw player resource cards
     const playerCards = players.find(player => player.id === socket.id)?.cards;
     for (let i = 0; i < playerCards?.length; i++) {
         drawCard(playerCards[i], i);
     }
+
+    // Discard button next to cards
     if (discardCardsData.areWeDiscarding) {
         drawDiscardButton();
     }
+
+    // Stealing Cards prompt
+    if (isPlayersTurn() && gameState.currentState === "PLAYER-STEALING-CARD") {
+        drawSelectCardPrompt();
+    }
+
+    // Draw the bank
+    drawBank();
+
 }
 
 function drawHex(x, y, resource, tokenValue, isHighlight = false) {
-    console.log(resource);
     ctx.beginPath();
     for (let i = 0; i < 6; i++) {
         ctx.lineTo(
@@ -234,7 +257,6 @@ function drawHex(x, y, resource, tokenValue, isHighlight = false) {
     if (resourceImages[resource] && !isHighlight) {
         ctx.drawImage(resourceImages[resource], x - Math.sqrt(3) / 2 * hexSize, y - hexSize, Math.sqrt(3) / 2 * hexSize * 2, hexSize * 2);
     }
-
     drawToken(ctx, x, y, 26, tokenValue || '');
 }
 
@@ -422,4 +444,68 @@ function drawToken(ctx, x, y, size, value) {
         ctx.closePath();
     }
 
+}
+
+let stealPlayerCardsPositions = [];
+function drawSelectCardPrompt() {
+    ctx.fillStyle = "#FFF";
+    const promptWidth = 600;
+    const promptHeight = 300;
+    const x = canvas.width / 2 - (promptWidth / 2);
+    const y = canvas.height / 2 - promptHeight;
+    ctx.fillRect(x, y, promptWidth, promptHeight);
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillStyle = "#000";
+    ctx.font = '24px Arcade';
+    ctx.fillText('Who do you want steal from?', x + promptWidth / 2, y + 20);
+
+    const playerCardWidth = 200;
+    const playerCardHeight = 150;
+    for (let i = 0; i < players.length; i++) {
+        const player = players[i];
+        console.log({ player });
+        ctx.font = '24px Arcade';
+        ctx.fillStyle = player.color;
+        const cardX = x + (playerCardWidth * i) + 5 * (i + 1);
+        const cardY = y + playerCardHeight;
+        ctx.fillRect(cardX, y + playerCardHeight / 2, playerCardWidth, playerCardHeight);
+        ctx.fillStyle = "#000";
+        ctx.textAlign = "start";
+        ctx.fillText(player.username, cardX + cardWidth, cardY);
+        ctx.fillStyle = "#FFF";
+        ctx.fillRect(cardX + 5, cardY + cardHeight / 2, 20, 25);
+        ctx.fillStyle = "#000";
+        ctx.font = '12px Arcade';
+        ctx.fillText(player.cards.length, cardX + 10, cardY + cardHeight / 2 + 12.5);
+        stealPlayerCardsPositions.push({ startX: cardX, startY: cardY, playerId: player.id, endX: cardX + playerCardWidth, endY: cardY + cardHeight });
+    }
+}
+
+
+function drawBank() {
+
+    const resources = Object.keys(gameState.bank);
+    resources.sort(key => key);
+
+    ctx.fillStyle = "purple";
+    const bankWidth = 350;
+    const bankHeight = 150;
+    const x = canvas.width - 425;
+    ctx.fillRect(x, 0, bankWidth, bankHeight);
+
+    for (let i = 0; i < resources.length; i++) {
+        const resource = resources[i];
+        ctx.font = '24px Arcade';
+        const resourceCardWidth = 50;
+        const resourceCardHeight = 100;
+        ctx.fillStyle = resourceColors[resource];
+        const cardX = 10 * i + i * resourceCardWidth + 30 + x;
+        ctx.fillRect(10 * i + i * resourceCardWidth + 30 + x, 25, resourceCardWidth, resourceCardHeight);
+        ctx.fillStyle = "#FFF";
+        ctx.fillRect(cardX + resourceCardWidth / 2 - 10,  resourceCardHeight / 2 + 12.5, 20, 25);
+        ctx.fillStyle = "#000";
+        ctx.font = '12px Arcade';
+        ctx.fillText(gameState.bank[resource], cardX + resourceCardWidth / 2, resourceCardHeight / 2 + 25);
+    }
 }

@@ -40,6 +40,14 @@ export function discardCards(newCards) {
     socket.emit('discard-cards', { roomId: getGameState().id, newCards });
 }
 
+export function moveKnight(hexIndex) {
+    socket.emit('move-knight', { roomId: getGameState().id, hexIndex });
+}
+
+export function stealCard(targetPlayerId) {
+    socket.emit('steal-card', { roomId: getGameState().id, targetPlayerId });
+}
+
 export function getPlayerWithCurrentTurn() {
     const gameState = getGameState();
     if (gameState.currentState === "LOBBY") return null;

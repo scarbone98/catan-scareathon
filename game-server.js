@@ -34,7 +34,14 @@ function initializeGameState() {
     let diceValues = null;
     let robberIndex = 0;
     let playersDiscardingCards = [];
-
+    let playersGettingRobbed = [];
+    let bank = {
+        'WHEAT': 20,
+        'BRICK': 20,
+        'ROCK': 20,
+        'SHEEP': 20,
+        'WOOD': 20
+    }
     // Board setup stuff
     const tokenDistribution = shuffle([2, 3, 3, 4, 4, 5, 5, 6, 6, 8, 8, 9, 9, 10, 10, 11, 11, 12]);
     const arrangedTiles = getTilesArray();
@@ -52,7 +59,9 @@ function initializeGameState() {
         desertIndex,
         tokenDistribution,
         arrangedTiles,
-        playersDiscardingCards
+        playersDiscardingCards,
+        playersGettingRobbed,
+        bank
     }
 }
 
